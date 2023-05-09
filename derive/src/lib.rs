@@ -33,7 +33,7 @@ pub fn decode_static_derive(input: proc_macro::TokenStream) -> proc_macro::Token
                     }
                 }
             }
-        },
+        }
         (Some(lifetime), None) => {
             quote! {
                 impl<#lifetime> DecodeStatic<#lifetime> for #name<#lifetime> {
@@ -42,7 +42,7 @@ pub fn decode_static_derive(input: proc_macro::TokenStream) -> proc_macro::Token
                     }
                 }
             }
-        },
+        }
         (None, Some(generic)) => {
             quote! {
                 impl<'a, #generic> DecodeStatic<'a> for #name<#generic>
@@ -54,7 +54,7 @@ pub fn decode_static_derive(input: proc_macro::TokenStream) -> proc_macro::Token
                     }
                 }
             }
-        },
+        }
         _ => {
             quote! {
                 impl<'a> DecodeStatic<'a> for #name {
@@ -64,7 +64,8 @@ pub fn decode_static_derive(input: proc_macro::TokenStream) -> proc_macro::Token
                 }
             }
         }
-    }.into()
+    }
+    .into()
 }
 
 fn decode_steps(data: Data) -> TokenStream {

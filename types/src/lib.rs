@@ -80,11 +80,9 @@ impl<'a> DecodeStatic<'a> for U256 {
         return Ok(result);
     }
 }
+
 impl<'a> DecodeStatic<'a> for BytesZcp<'a> {
     fn decode_static(buf: &'a [u8], len_offset: usize) -> Result<Self, ()> {
-        // if we are given head `offset` then this decodes by jumping to the tail offset
-        // however we are given tail offset already
-        // let mut dynamic_offset = as_usize(&buf[offset..offset + 32]);
         let data_offset = len_offset + 32;
         let len = as_usize(&buf[len_offset..]);
         let result = BytesZcp(&buf[data_offset..data_offset + len]);
@@ -111,12 +109,12 @@ where
         let len_offset = as_usize(&buf[offset..]);
         let len = as_usize(&buf[len_offset..]);
         let tail_offset = len_offset + 32;
-        let shift = 64 + len_offset;
+        let shift = 32 + len_offset;
 
         return Ok((0..len)
             .map(|i| {
                 let next_tail_offset = tail_offset + i * 32;
-                // the tail offsets don't include the outer header words hence +64
+                // the tail offsets don't include the outer header hence +shift
                 as_usize(&unsafe { buf.get_unchecked(next_tail_offset..) }) + shift
             })
             .map(|o| T::decode(&unsafe { buf.get_unchecked(o..) }).unwrap())
@@ -127,7 +125,6 @@ where
 
 impl<'a> DecodeStatic<'a> for Vec<BytesZcp<'a>> {
     fn decode_static(buf: &'a [u8], len_offset: usize) -> Result<Self, ()> {
-        // let len_offset = as_usize(&buf[offset..]);
         let len = as_usize(&buf[len_offset..]);
         let tail_offset = len_offset + 32;
 
@@ -135,10 +132,10 @@ impl<'a> DecodeStatic<'a> for Vec<BytesZcp<'a>> {
             .map(|i| {
                 let next_tail_offset = tail_offset + i * 32;
                 // the tail offsets don't include the outer header words hence +64
-                as_usize(&buf[next_tail_offset..]) + 32 + len_offset
+                as_usize(&unsafe { buf.get_unchecked(next_tail_offset..) }) + len_offset + 32
             })
             .map(|o| {
-                let res: BytesZcp<'_> = DecodeStatic::decode_static(buf, o).unwrap();
+                let res: BytesZcp<'_> = DecodeStatic::decode(&buf[o..]).unwrap();
                 res
             })
             .collect());
@@ -168,9 +165,7 @@ where
     fn decode_static(buf: &'a [u8], len_offset: usize) -> Result<Self, ()> {
         let data_offset = len_offset + 32;
         let len = as_usize(&buf[len_offset..]);
-        Ok(Wrapped(T::decode(
-            &buf[data_offset..data_offset + len],
-        )?))
+        Ok(Wrapped(T::decode(&buf[data_offset..data_offset + len])?))
     }
 }
 
@@ -291,7 +286,7 @@ mod bench {
             b: AddressZcp<'a>,
             c: U256,
             d: BytesZcp<'a>,
-            e: Tuples<BytesZcp<'a>>,
+            e: Vec<BytesZcp<'a>>,
             f: FixedBytesZcp<'a, 8>,
         }
 
@@ -350,7 +345,8 @@ mod test {
 
         let input = hex_literal::hex!("00000000000000000000000012345678912345678911111111111111111111110000000000000000000000001234567891234567891111111111111111111222000000000000000000000000000000000000000000000000000000000000303900000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000001001122334455667788000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001a10000000000000000000000000000000000000000000000000ff000000000000000000000000000000000000000000000000000000000000000000000000000700000000000000000000000000000000000000000000000000000000000000e00000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000000000000000000000001a000000000000000000000000000000000000000000000000000000000000001e000000000000000000000000000000000000000000000000000000000000002200000000000000000000000000000000000000000000000000000000000000260000000000000000000000000000000000000000000000000000000000000000213370000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002b33f0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003a4b05000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001370000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010b00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000116000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001ff00000000000000000000000000000000000000000000000000000000000000");
 
-        let t = Thingy::decode_static(&input, 0_usize);
+        // TODO: Tuples<x> working but this isnt...
+        let t = Thingy::decode(&input);
         println!("{:?}", t);
         assert!(t.is_ok());
     }
@@ -417,7 +413,8 @@ mod test {
             data: Wrapped<T>,
         }
 
-        let out: Tuples<GenericResult3<UniswapV2Reserves>> = DecodeStatic::decode(V2_RESULTS).expect("it decodes");
+        let out: Tuples<GenericResult3<UniswapV2Reserves>> =
+            DecodeStatic::decode(V2_RESULTS).expect("it decodes");
         println!("{:?}", out);
     }
 }
