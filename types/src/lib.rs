@@ -1,7 +1,7 @@
 //! Ethereum ABI static types and impls
 #![cfg_attr(feature = "bench", feature(test))]
 
-use ethereum_types::{U128, U256};
+use ethereum_types::U256;
 
 /// Provides statically generated Eth ABI decode implementation
 pub trait DecodeStatic<'a>: Sized {
@@ -205,7 +205,7 @@ where
     T: DecodeStatic<'a>,
 {
     fn decode_static(buf: &'a [u8], len_offset: usize) -> Result<Self, ()> {
-        let data_offset = len_offset + 32;
+        let data_offset = len_offset + 64;
         let len = as_usize(&buf[len_offset..]);
         Ok(Wrapped(T::decode(&buf[data_offset..data_offset + len])?))
     }
@@ -369,6 +369,7 @@ mod bench {
 mod test {
     #[allow(dead_code)]
     use ethabi::ParamType;
+    use ethabi::Token;
     use ethereum_types::U256;
     use hex_literal::hex;
 
@@ -486,5 +487,45 @@ mod test {
             },
             out.unwrap(),
         )
+    }
+
+    #[test]
+    fn eth_abi_results2() {
+        #[derive(Debug, DecodeStatic)]
+        struct UniswapV2Reserves {
+            r0: u128,
+            r1: u128,
+        }
+
+        #[derive(Debug, DecodeStatic)]
+        struct Result3 {
+            success: bool,
+            return_data: Wrapped<UniswapV2Reserves>,
+        }
+
+        let params = [ParamType::Array(Box::new(ParamType::Tuple(vec![
+            ParamType::Bool,
+            ParamType::Bytes,
+        ])))];
+        let out = ethabi::decode(&params, V2_RESULTS);
+        println!("{:?}", out);
+
+        if let Token::Array(list) = &out.unwrap()[0] {
+            for t in list {
+                match t {
+                    Token::Tuple(ref inner) => {
+                        let x = [ParamType::Uint(256), ParamType::Uint(256)];
+                        match &inner[1] {
+                            Token::Bytes(bytes) => {
+                                let out = ethabi::decode(&x, bytes);
+                                println!("{:?}", out);
+                            }
+                            _ => (),
+                        }
+                    }
+                    _ => (),
+                }
+            }
+        }
     }
 }
