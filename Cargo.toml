@@ -1,0 +1,13 @@
+[package]
+name = "ethabi-static"
+version = "0.1.0"
+edition = "2021"
+authors = ["jordy25519"]
+description = "decode Ethereum ABI types"
+
+[dependencies]
+ethabi-static-derive = { path = "./derive" }
+ethabi-static-types = { path = "./types" }
+
+[workspace]
+members = ["derive", "types"]

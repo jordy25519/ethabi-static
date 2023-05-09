@@ -1,0 +1,23 @@
+[package]
+name = "ethabi-static-types"
+version = "0.1.0"
+edition = "2021"
+authors = ["jordy25519"]
+license = "Apache-2.0"
+keywords = ["ethereum", "eth", "abi", "solidity", "derive"]
+description = "Types for ethabi-static"
+
+[features]
+bench = []
+
+[dependencies]
+ethereum-types = { version = "*" }
+
+[profile.release]
+debug = true
+lto = "fat"
+
+[dev-dependencies]
+ethabi = "*"
+ethabi-static-derive = { path = "../derive" }
+hex-literal = "*"
