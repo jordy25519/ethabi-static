@@ -15,26 +15,56 @@ pub fn decode_static_derive(input: proc_macro::TokenStream) -> proc_macro::Token
 
     let name = &input.ident;
     let steps = decode_steps(input.data);
-    // quick-n-dirty lifetime no lifetime (will fail on generic structs)
-    if input.generics.lt_token.is_some() {
-        quote! {
-            impl<'a> DecodeStatic<'a> for #name<'a> {
-                fn decode_static(buf: &'a [u8], offset: usize) -> Result<Self, ()> {
-                    #steps
+
+    // TODO: do this with one quote...
+    // support 1 lifetime and 1 generic only
+    let lifetime = input.generics.lifetimes().nth(0);
+    let generic = input.generics.type_params().nth(0);
+
+    match (lifetime, generic) {
+        (Some(lifetime), Some(generic)) => {
+            quote! {
+                impl<#lifetime, #generic> DecodeStatic<#lifetime> for #name<#lifetime, #generic>
+                where
+                    #generic: DecodeStatic<#lifetime>
+                {
+                    fn decode_static(buf: &#lifetime [u8], offset: usize) -> Result<Self, ()> {
+                        #steps
+                    }
+                }
+            }
+        },
+        (Some(lifetime), None) => {
+            quote! {
+                impl<#lifetime> DecodeStatic<#lifetime> for #name<#lifetime> {
+                    fn decode_static(buf: &#lifetime [u8], offset: usize) -> Result<Self, ()> {
+                        #steps
+                    }
+                }
+            }
+        },
+        (None, Some(generic)) => {
+            quote! {
+                impl<'a, #generic> DecodeStatic<'a> for #name<#generic>
+                where
+                    #generic: DecodeStatic<'a>
+                {
+                    fn decode_static(buf: &'a [u8], offset: usize) -> Result<Self, ()> {
+                        #steps
+                    }
+                }
+            }
+        },
+        _ => {
+            quote! {
+                impl<'a> DecodeStatic<'a> for #name {
+                    fn decode_static(buf: &'a [u8], offset: usize) -> Result<Self, ()> {
+                        #steps
+                    }
                 }
             }
         }
-        .into()
-    } else {
-        quote! {
-            impl<'a> DecodeStatic<'a> for #name {
-                fn decode_static(buf: &'a [u8], offset: usize) -> Result<Self, ()> {
-                    #steps
-                }
-            }
-        }
-        .into()
-    }
+    }.into()
 }
 
 fn decode_steps(data: Data) -> TokenStream {

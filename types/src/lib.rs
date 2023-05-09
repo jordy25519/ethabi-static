@@ -80,7 +80,6 @@ impl<'a> DecodeStatic<'a> for U256 {
         return Ok(result);
     }
 }
-
 impl<'a> DecodeStatic<'a> for BytesZcp<'a> {
     fn decode_static(buf: &'a [u8], len_offset: usize) -> Result<Self, ()> {
         // if we are given head `offset` then this decodes by jumping to the tail offset
@@ -88,7 +87,7 @@ impl<'a> DecodeStatic<'a> for BytesZcp<'a> {
         // let mut dynamic_offset = as_usize(&buf[offset..offset + 32]);
         let data_offset = len_offset + 32;
         let len = as_usize(&buf[len_offset..]);
-        let result = BytesZcp(&unsafe { buf.get_unchecked(data_offset..data_offset + len) });
+        let result = BytesZcp(&buf[data_offset..data_offset + len]);
         return Ok(result);
     }
 }
@@ -149,15 +148,14 @@ impl<'a> DecodeStatic<'a> for Vec<BytesZcp<'a>> {
 /// Helper type meaning a type encoded as `bytes` should be decoded as a `T`
 ///  E.g. the makerdao multicall contract returns ABI encoded results from proxy calls
 ///
-/// ``example
-///     struct ContractResult {
-///         a: U256,
-///         b: Address,
+/// ``ignore
+///     struct ContractResult<'a> {
+///         a: BytesZcp<'a>,
+///         b: AddressZcp<'a>,
 ///     }
-///
-///     struct Result {
+///     struct Result<'a> {
 ///         success: bool,
-///         return_data: Wrapped<ContractResult>,
+///         return_data: Wrapped<ContractResult<'a>>,
 ///     }
 /// ```
 #[derive(Debug)]
@@ -170,9 +168,8 @@ where
     fn decode_static(buf: &'a [u8], len_offset: usize) -> Result<Self, ()> {
         let data_offset = len_offset + 32;
         let len = as_usize(&buf[len_offset..]);
-        Ok(Wrapped(T::decode_static(
+        Ok(Wrapped(T::decode(
             &buf[data_offset..data_offset + len],
-            0,
         )?))
     }
 }
@@ -403,6 +400,24 @@ mod test {
         }
 
         let out: Tuples<Result3> = DecodeStatic::decode(V2_RESULTS).expect("it decodes");
+        println!("{:?}", out);
+    }
+
+    #[test]
+    fn decode_vec_of_tuples_with_unwrapping_generic() {
+        #[derive(Debug, DecodeStatic)]
+        struct UniswapV2Reserves {
+            r0: U256,
+            r1: U256,
+        }
+
+        #[derive(Debug, DecodeStatic)]
+        struct GenericResult3<T> {
+            ok: bool,
+            data: Wrapped<T>,
+        }
+
+        let out: Tuples<GenericResult3<UniswapV2Reserves>> = DecodeStatic::decode(V2_RESULTS).expect("it decodes");
         println!("{:?}", out);
     }
 }
