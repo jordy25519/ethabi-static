@@ -26,6 +26,12 @@ impl<'a> AddressZcp<'a> {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct BytesZcp<'a>(&'a [u8]);
 
+impl<'a> AsRef<[u8]> for BytesZcp<'a> {
+    fn as_ref(&self) -> &[u8] {
+        self.0
+    }
+}
+
 /// bytesN
 #[derive(Debug)]
 pub struct FixedBytesZcp<'a, const N: usize>(&'a [u8; N]);
