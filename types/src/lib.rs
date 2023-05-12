@@ -16,6 +16,12 @@ pub trait DecodeStatic<'a>: Sized {
 #[derive(Debug)]
 pub struct AddressZcp<'a>(&'a [u8; 20]);
 
+impl<'a> AsRef<[u8; 20]> for AddressZcp<'a> {
+    fn as_ref(&self) -> &[u8; 20] {
+        self.0
+    }
+}
+
 impl<'a> AddressZcp<'a> {
     fn new(buf: &'a [u8]) -> Self {
         Self(slice_as_array(buf))
