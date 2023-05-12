@@ -4,9 +4,9 @@
 //! Trades binary size for performance vs. ethabi
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
-use syn::{Data, DeriveInput, Fields};
+use syn::{parse::Parse, spanned::Spanned, Attribute, Data, DeriveInput, Fields, Meta, NestedMeta};
 
-#[proc_macro_derive(DecodeStatic)]
+#[proc_macro_derive(DecodeStatic, attributes(ethabi))]
 pub fn decode_static_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input: DeriveInput = match syn::parse(input) {
         Ok(input) => input,
@@ -81,10 +81,18 @@ fn decode_steps(data: Data) -> TokenStream {
                     let f_type = &f.ty;
                     let offset = idx * 32_usize;
                     let type_string = f_type.to_token_stream().to_string();
-                    // could add more types here..
                     let is_dynamic =
                         type_string.starts_with("Bytes") || type_string.starts_with("Vec"); // Vec equivalent to solidity Array
                                                                                             // always read head values then tail values for better locality
+                    if should_skip(&f.attrs) {
+                        tail_stmts.push(
+                            quote! {
+                                #f_name: Default::default(),
+                            }
+                            .into(),
+                        );
+                        continue;
+                    }
                     if !is_dynamic {
                         head_stmts.push(
                             quote! {
@@ -127,4 +135,32 @@ fn decode_steps(data: Data) -> TokenStream {
         },
         _ => unimplemented!(),
     }
+}
+
+/// Look for a `#[ethabi(skip)]` in the given attributes.
+fn should_skip(attrs: &[Attribute]) -> bool {
+    find_meta_item(attrs.iter(), |meta| {
+        if let NestedMeta::Meta(Meta::Path(ref path)) = meta {
+            if path.is_ident("skip") {
+                return Some(path.span());
+            }
+        }
+
+        None
+    })
+    .is_some()
+}
+
+fn find_meta_item<'a, F, R, I, M>(mut itr: I, mut pred: F) -> Option<R>
+where
+    F: FnMut(M) -> Option<R> + Clone,
+    I: Iterator<Item = &'a Attribute>,
+    M: Parse,
+{
+    itr.find_map(|attr| {
+        attr.path
+            .is_ident("ethabi")
+            .then(|| pred(attr.parse_args().ok()?))
+            .flatten()
+    })
 }

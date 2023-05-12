@@ -23,7 +23,7 @@ impl<'a> AddressZcp<'a> {
 }
 
 /// yet another borrowed bytes type...
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, PartialEq)]
 pub struct BytesZcp<'a>(&'a [u8]);
 
 impl<'a> AsRef<[u8]> for BytesZcp<'a> {
@@ -184,6 +184,44 @@ impl<'a> DecodeStatic<'a> for Vec<BytesZcp<'a>> {
     }
 }
 
+/// Decode a vector of dynamic tuples into the given buffer
+pub fn decode_dynamic_list_into<'a, T: DecodeStatic<'a>>(
+    buf: &'a [u8],
+    offset: usize,
+    dst: &mut Vec<T>,
+) {
+    let len_offset = as_usize(&buf[offset..]);
+    let len = as_usize(&buf[len_offset..]);
+    let tail_offset = len_offset + 32;
+    let shift = 32 + len_offset;
+
+    (0..len)
+        .map(|i| {
+            let next_tail_offset = tail_offset + i * 32;
+            // the tail offsets don't include the outer header hence +shift
+            as_usize(&unsafe { buf.get_unchecked(next_tail_offset..) }) + shift
+        })
+        .for_each(|o| {
+            dst.push(T::decode(&buf[o..]).unwrap());
+        });
+}
+
+/// Decode a vector of static `T`s into the given buffer
+pub fn decode_static_list_into<'a, T: DecodeStatic<'a>>(
+    buf: &'a [u8],
+    offset: usize,
+    dst: &mut Vec<T>,
+) {
+    let len_offset = as_usize(&buf[offset..]);
+    let len = as_usize(&buf[len_offset..]);
+    let tail_offset = len_offset + 32;
+
+    (0..len).for_each(|i| {
+        let next_tail_offset = tail_offset + i * 32;
+        dst.push(T::decode(&buf[next_tail_offset..]).unwrap());
+    })
+}
+
 /// Helper type meaning a type encoded as `bytes` should be decoded as a `T`
 ///  E.g. the makerdao multicall contract returns ABI encoded results from proxy calls
 ///
@@ -197,7 +235,7 @@ impl<'a> DecodeStatic<'a> for Vec<BytesZcp<'a>> {
 ///         return_data: Wrapped<ContractResult<'a>>,
 ///     }
 /// ```
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Wrapped<T>(pub T);
 
 impl<'a, T> DecodeStatic<'a> for Wrapped<T>
@@ -205,7 +243,7 @@ where
     T: DecodeStatic<'a>,
 {
     fn decode_static(buf: &'a [u8], len_offset: usize) -> Result<Self, ()> {
-        let data_offset = len_offset + 64;
+        let data_offset = len_offset + 64; // = bytes offset + bytes length
         let len = as_usize(&buf[len_offset..]);
         Ok(Wrapped(T::decode(&buf[data_offset..data_offset + len])?))
     }
@@ -390,7 +428,6 @@ mod test {
 
         let input = hex!("00000000000000000000000012345678912345678911111111111111111111110000000000000000000000001234567891234567891111111111111111111222000000000000000000000000000000000000000000000000000000000000303900000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000001001122334455667788000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001a10000000000000000000000000000000000000000000000000ff000000000000000000000000000000000000000000000000000000000000000000000000000700000000000000000000000000000000000000000000000000000000000000e00000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000000000000000000000001a000000000000000000000000000000000000000000000000000000000000001e000000000000000000000000000000000000000000000000000000000000002200000000000000000000000000000000000000000000000000000000000000260000000000000000000000000000000000000000000000000000000000000000213370000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002b33f0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003a4b05000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001370000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010b00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000116000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001ff00000000000000000000000000000000000000000000000000000000000000");
 
-        // TODO: Tuples<x> working but this isnt...
         let t = Thingy::decode(&input);
         println!("{:?}", t);
         assert!(t.is_ok());
@@ -416,7 +453,7 @@ mod test {
 
     #[test]
     fn decode_vec_of_tuples() {
-        #[derive(Debug, DecodeStatic)]
+        #[derive(Debug, DecodeStatic, PartialEq)]
         struct Result3<'a> {
             success: bool,
             return_data: BytesZcp<'a>,
@@ -424,6 +461,53 @@ mod test {
 
         let out: Tuples<Result3<'_>> = DecodeStatic::decode(V2_RESULTS).unwrap();
         println!("{:?}", out);
+        assert_eq!(
+            out.0,
+            vec![
+                Result3 {
+                    success: true,
+                    return_data: BytesZcp(&[
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 219,
+                        86, 223, 166, 126, 253, 44, 225, 114, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 215, 72, 136, 190, 68, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 100, 88, 235, 23
+                    ])
+                },
+                Result3 {
+                    success: true,
+                    return_data: BytesZcp(&[
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32,
+                        97, 86, 209, 214, 142, 148, 78, 121, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 200, 212, 171, 39, 142, 158, 79, 78, 55, 216, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 100, 88, 234, 86
+                    ])
+                },
+                Result3 {
+                    success: true,
+                    return_data: BytesZcp(&[
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 125,
+                        250, 204, 71, 5, 30, 121, 220, 192, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 237, 86, 153, 222, 242, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 1, 44, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 44
+                    ])
+                },
+                Result3 {
+                    success: true,
+                    return_data: BytesZcp(&[
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 105,
+                        80, 85, 99, 225, 225, 129, 6, 114, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 2, 143, 23, 78, 238, 76, 51, 223, 120, 207, 83, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 1, 44, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 44
+                    ])
+                }
+            ]
+        )
     }
 
     #[test]
@@ -446,21 +530,55 @@ mod test {
 
     #[test]
     fn decode_vec_of_tuples_with_unwrapping_generic() {
-        #[derive(Debug, DecodeStatic)]
+        #[derive(Debug, PartialEq, DecodeStatic)]
         struct UniswapV2Reserves {
             r0: u128,
             r1: u128,
         }
 
-        #[derive(Debug, DecodeStatic)]
+        #[derive(Debug, PartialEq, DecodeStatic)]
         struct GenericResult3<T> {
+            #[ethabi(skip)]
             ok: bool,
             data: Wrapped<T>,
         }
 
         let out: Tuples<GenericResult3<UniswapV2Reserves>> =
             DecodeStatic::decode(V2_RESULTS).expect("it decodes");
-        println!("{:?}", out);
+
+        assert_eq!(
+            out.0,
+            vec![
+                GenericResult3 {
+                    ok: false,
+                    data: Wrapped(UniswapV2Reserves {
+                        r0: 4046096857213803749746,
+                        r1: 7521704656452
+                    })
+                },
+                GenericResult3 {
+                    ok: false,
+                    data: Wrapped(UniswapV2Reserves {
+                        r0: 597309834547827068537,
+                        r1: 948396339300470631577560
+                    })
+                },
+                GenericResult3 {
+                    ok: false,
+                    data: Wrapped(UniswapV2Reserves {
+                        r0: 2323914906705736621248,
+                        r1: 4317895057138
+                    })
+                },
+                GenericResult3 {
+                    ok: false,
+                    data: Wrapped(UniswapV2Reserves {
+                        r0: 1942696770457359681138,
+                        r1: 3093580008960478026452819
+                    })
+                }
+            ]
+        )
     }
 
     #[test]
@@ -491,18 +609,6 @@ mod test {
 
     #[test]
     fn eth_abi_results2() {
-        #[derive(Debug, DecodeStatic)]
-        struct UniswapV2Reserves {
-            r0: u128,
-            r1: u128,
-        }
-
-        #[derive(Debug, DecodeStatic)]
-        struct Result3 {
-            success: bool,
-            return_data: Wrapped<UniswapV2Reserves>,
-        }
-
         let params = [ParamType::Array(Box::new(ParamType::Tuple(vec![
             ParamType::Bool,
             ParamType::Bytes,

@@ -2,7 +2,7 @@
 
 Generates efficient Ethereum ABI decoders at compile time  
 
-You probably don't want this crate. It assumes all input is trusted and sacrifices all else for decoding speed.  
+You probably don't want this crate. It assumes all input is well-formed and sacrifices all else for decoding speed.  
 Not feature complete, will accept PRs.
 
 ```rust
@@ -13,6 +13,7 @@ struct Foo<'a> {
     a: AddressZcp<'a>,
     b: AddressZcp<'a>,
     c: U256,
+    #[ethabi(skip)]
     d: BytesZcp<'a>,
     e: Vec<BytesZcp<'a>>,
     f: FixedBytesZcp<'a, 8>,
