@@ -14,10 +14,10 @@ pub trait DecodeStatic<'a>: Sized {
 }
 
 #[derive(Debug)]
-pub struct AddressZcp<'a>(&'a [u8; 20]);
+pub struct AddressZcp<'a>(pub &'a [u8; 20]);
 
 impl<'a> AsRef<[u8; 20]> for AddressZcp<'a> {
-    fn as_ref(&self) -> &[u8; 20] {
+    fn as_ref(&self) -> &'a [u8; 20] {
         self.0
     }
 }
