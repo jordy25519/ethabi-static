@@ -1,6 +1,6 @@
 # ethabi-static
-
-Generates efficient Ethereum ABI decoders at compile time  
+[![Build](https://github.com/jordy25519/ethabi-static/actions/workflows/build.yml/badge.svg)](https://github.com/jordy25519/ethabi-static/actions/workflows/build.yml)
+Generates efficient Ethereum ABI decoders at compile time, >10x speed up vs. `ethabi`
 
 You probably don't want this crate. It assumes all input is well-formed and sacrifices all else for decoding speed.  
 Not feature complete, will accept PRs.
