@@ -1,9 +1,10 @@
 # ethabi-static
-[![Build](https://github.com/jordy25519/ethabi-static/actions/workflows/build.yml/badge.svg)](https://github.com/jordy25519/ethabi-static/actions/workflows/build.yml)
-Generates efficient Ethereum ABI decoders at compile time, >10x speed up vs. `ethabi`
+[![Build](https://github.com/jordy25519/ethabi-static/actions/workflows/build.yml/badge.svg)](https://github.com/jordy25519/ethabi-static/actions/workflows/build.yml)  
+Generates efficient Ethereum ABI decoders at compile time.  
+~10-15x speed up vs. `ethabi`  
 
 You probably don't want this crate. It assumes all input is well-formed and sacrifices all else for decoding speed.  
-Not feature complete, will accept PRs.
+Not feature complete, will accept PRs (could be easily extended to support encoding also).
 
 ```rust
 use ethabi_static_derive::DecodeStatic;
