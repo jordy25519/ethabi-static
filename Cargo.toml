@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["jordy25519"]
 description = "decode Ethereum ABI types"
+repository = "https://github.com/jordy25519/ethabi-static"
 
 [dependencies]
 ethabi-static-derive = { path = "./derive", version = "0.1.0" }
