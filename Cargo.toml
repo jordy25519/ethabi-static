@@ -6,8 +6,8 @@ authors = ["jordy25519"]
 description = "decode Ethereum ABI types"
 
 [dependencies]
-ethabi-static-derive = { path = "./derive" }
-ethabi-static-types = { path = "./types" }
+ethabi-static-derive = { path = "./derive", version = "0.1.0" }
+ethabi-static-types = { path = "./types", version = "0.1.0" }
 
 [workspace]
 members = ["derive", "types"]
