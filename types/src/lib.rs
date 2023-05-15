@@ -68,7 +68,7 @@ fn as_usize(buf: &[u8]) -> usize {
 impl<'a> DecodeStatic<'a> for AddressZcp<'a> {
     fn decode_static(buf: &'a [u8], offset: usize) -> Result<Self, ()> {
         let result = AddressZcp::new(&buf[offset + 12..offset + 32]);
-        return Ok(result);
+        Ok(result)
     }
 }
 
@@ -80,46 +80,46 @@ impl<'a> DecodeStatic<'a> for bool {
 
 impl<'a> DecodeStatic<'a> for U256 {
     fn decode_static(buf: &'a [u8], offset: usize) -> Result<Self, ()> {
-        let result = U256::from(slice_as_array(&unsafe {
+        let result = U256::from(slice_as_array(unsafe {
             buf.get_unchecked(offset..offset + 32_usize)
         }));
-        return Ok(result);
+        Ok(result)
     }
 }
 
 impl<'a> DecodeStatic<'a> for u128 {
     fn decode_static(buf: &'a [u8], offset: usize) -> Result<Self, ()> {
-        let result = u128::from_be_bytes(*slice_as_array(&unsafe {
+        let result = u128::from_be_bytes(*slice_as_array(unsafe {
             buf.get_unchecked(offset + 16..offset + 32_usize)
         }));
-        return Ok(result);
+        Ok(result)
     }
 }
 
 impl<'a> DecodeStatic<'a> for u64 {
     fn decode_static(buf: &'a [u8], offset: usize) -> Result<Self, ()> {
-        let result = u64::from_be_bytes(*slice_as_array(&unsafe {
+        let result = u64::from_be_bytes(*slice_as_array(unsafe {
             buf.get_unchecked(offset + 24..offset + 32_usize)
         }));
-        return Ok(result);
+        Ok(result)
     }
 }
 
 impl<'a> DecodeStatic<'a> for u32 {
     fn decode_static(buf: &'a [u8], offset: usize) -> Result<Self, ()> {
-        let result = u32::from_be_bytes(*slice_as_array(&unsafe {
+        let result = u32::from_be_bytes(*slice_as_array(unsafe {
             buf.get_unchecked(offset + 28..offset + 32_usize)
         }));
-        return Ok(result);
+        Ok(result)
     }
 }
 
 impl<'a> DecodeStatic<'a> for u16 {
     fn decode_static(buf: &'a [u8], offset: usize) -> Result<Self, ()> {
-        let result = u16::from_be_bytes(*slice_as_array(&unsafe {
+        let result = u16::from_be_bytes(*slice_as_array(unsafe {
             buf.get_unchecked(offset + 30..offset + 32_usize)
         }));
-        return Ok(result);
+        Ok(result)
     }
 }
 
@@ -134,7 +134,7 @@ impl<'a> DecodeStatic<'a> for BytesZcp<'a> {
         let data_offset = len_offset + 32;
         let len = as_usize(&buf[len_offset..]);
         let result = BytesZcp(&buf[data_offset..data_offset + len]);
-        return Ok(result);
+        Ok(result)
     }
 }
 
@@ -159,15 +159,15 @@ where
         let tail_offset = len_offset + 32;
         let shift = 32 + len_offset;
 
-        return Ok((0..len)
+        Ok((0..len)
             .map(|i| {
                 let next_tail_offset = tail_offset + i * 32;
                 // the tail offsets don't include the outer header hence +shift
-                as_usize(&unsafe { buf.get_unchecked(next_tail_offset..) }) + shift
+                as_usize(unsafe { buf.get_unchecked(next_tail_offset..) }) + shift
             })
-            .map(|o| T::decode(&unsafe { buf.get_unchecked(o..) }).unwrap())
+            .map(|o| T::decode(unsafe { buf.get_unchecked(o..) }).unwrap())
             .collect::<Vec<T>>()
-            .into());
+            .into())
     }
 }
 
@@ -176,17 +176,17 @@ impl<'a> DecodeStatic<'a> for Vec<BytesZcp<'a>> {
         let len = as_usize(&buf[len_offset..]);
         let tail_offset = len_offset + 32;
 
-        return Ok((0..len)
+        Ok((0..len)
             .map(|i| {
                 let next_tail_offset = tail_offset + i * 32;
                 // the tail offsets don't include the outer header words hence +64
-                as_usize(&unsafe { buf.get_unchecked(next_tail_offset..) }) + len_offset + 32
+                as_usize(unsafe { buf.get_unchecked(next_tail_offset..) }) + len_offset + 32
             })
             .map(|o| {
                 let res: BytesZcp<'_> = DecodeStatic::decode(&buf[o..]).unwrap();
                 res
             })
-            .collect());
+            .collect())
     }
 }
 
@@ -205,7 +205,7 @@ pub fn decode_dynamic_list_into<'a, T: DecodeStatic<'a>>(
         .map(|i| {
             let next_tail_offset = tail_offset + i * 32;
             // the tail offsets don't include the outer header hence +shift
-            as_usize(&unsafe { buf.get_unchecked(next_tail_offset..) }) + shift
+            as_usize(unsafe { buf.get_unchecked(next_tail_offset..) }) + shift
         })
         .for_each(|o| {
             dst.push(T::decode(&buf[o..]).unwrap());
@@ -277,7 +277,7 @@ where
 impl<'a, const N: usize> DecodeStatic<'a> for FixedBytesZcp<'a, N> {
     fn decode_static(buf: &'a [u8], offset: usize) -> Result<Self, ()> {
         let result = Self::new(&buf[offset..offset + 32]);
-        return Ok(result);
+        Ok(result)
     }
 }
 
@@ -302,6 +302,7 @@ impl<'a, const N: usize> DecodeStatic<'a> for FixedBytesZcp<'a, N> {
 //     }
 // }
 
+#[cfg(test)]
 const V2_RESULTS: &[u8] = &[
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,

@@ -18,8 +18,8 @@ pub fn decode_static_derive(input: proc_macro::TokenStream) -> proc_macro::Token
 
     // TODO: do this with one quote...
     // support 1 lifetime and 1 generic only
-    let lifetime = input.generics.lifetimes().nth(0);
-    let generic = input.generics.type_params().nth(0);
+    let lifetime = input.generics.lifetimes().next();
+    let generic = input.generics.type_params().next();
 
     match (lifetime, generic) {
         (Some(lifetime), Some(generic)) => {
@@ -85,41 +85,28 @@ fn decode_steps(data: Data) -> TokenStream {
                         type_string.starts_with("Bytes") || type_string.starts_with("Vec"); // Vec equivalent to solidity Array
                                                                                             // always read head values then tail values for better locality
                     if should_skip(&f.attrs) {
-                        tail_stmts.push(
-                            quote! {
-                                #f_name: Default::default(),
-                            }
-                            .into(),
-                        );
+                        tail_stmts.push(quote! {
+                            #f_name: Default::default(),
+                        });
                         continue;
                     }
                     if !is_dynamic {
-                        head_stmts.push(
-                            quote! {
-                                let #f_name = <#f_type>::decode_static(buf, #offset)?;
-                            }
-                            .into(),
-                        );
-                        tail_stmts.push(
-                            quote! {
-                                #f_name,
-                            }
-                            .into(),
-                        );
+                        head_stmts.push(quote! {
+                            let #f_name = <#f_type>::decode_static(buf, #offset)?;
+                        });
+                        tail_stmts.push(quote! {
+                            #f_name,
+                        });
                     } else {
                         // if dynamic we read the head then decode tail after
                         head_stmts.push(
                             quote! {
                                 let #f_name = ((unsafe { *buf.get_unchecked(#offset + 30) } as usize) << 8) + (unsafe { *buf.get_unchecked(#offset + 31) } as usize);
                             }
-                            .into(),
                         );
-                        tail_stmts.push(
-                            quote! {
-                                #f_name: <#f_type>::decode_static(buf, #f_name)?,
-                            }
-                            .into(),
-                        );
+                        tail_stmts.push(quote! {
+                            #f_name: <#f_type>::decode_static(buf, #f_name)?,
+                        });
                     }
                 }
 
@@ -129,7 +116,6 @@ fn decode_steps(data: Data) -> TokenStream {
                         #(#tail_stmts)*
                     })
                 }
-                .into()
             }
             _ => unimplemented!(),
         },
