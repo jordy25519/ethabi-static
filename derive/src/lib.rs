@@ -81,29 +81,37 @@ fn decode_steps(data: Data) -> TokenStream {
                     let f_type = &f.ty;
                     let offset = idx * 32_usize;
                     let type_string = f_type.to_token_stream().to_string();
-                    let is_dynamic =
-                        type_string.starts_with("Bytes") || type_string.starts_with("Vec"); // Vec equivalent to solidity Array
-                                                                                            // always read head values then tail values for better locality
+                    let is_bytes = type_string.contains("BytesZcp");
+                    let is_statics_list = !is_bytes && type_string.starts_with("Vec");
+
                     if should_skip(&f.attrs) {
                         tail_stmts.push(quote! {
                             #f_name: Default::default(),
                         });
                         continue;
                     }
-                    if !is_dynamic {
+
+                    if !is_bytes && !is_statics_list {
                         head_stmts.push(quote! {
                             let #f_name = <#f_type>::decode_static(buf, #offset)?;
                         });
                         tail_stmts.push(quote! {
                             #f_name,
                         });
+                        continue;
+                    }
+
+                    // if dynamic we read the head then decode tail after
+                    head_stmts.push(
+                        quote! {
+                            let #f_name = ((unsafe { *buf.get_unchecked(#offset + 30) } as usize) << 8) + (unsafe { *buf.get_unchecked(#offset + 31) } as usize);
+                        }
+                    );
+                    if is_statics_list {
+                        tail_stmts.push(quote! {
+                            #f_name: <_ethabi_static::StaticsVec<_>>::decode_static(buf, #f_name)?.0,
+                        });
                     } else {
-                        // if dynamic we read the head then decode tail after
-                        head_stmts.push(
-                            quote! {
-                                let #f_name = ((unsafe { *buf.get_unchecked(#offset + 30) } as usize) << 8) + (unsafe { *buf.get_unchecked(#offset + 31) } as usize);
-                            }
-                        );
                         tail_stmts.push(quote! {
                             #f_name: <#f_type>::decode_static(buf, #f_name)?,
                         });
@@ -111,6 +119,7 @@ fn decode_steps(data: Data) -> TokenStream {
                 }
 
                 quote! {
+                    extern crate ethabi_static as _ethabi_static;
                     #(#head_stmts)*
                     Ok(Self {
                         #(#tail_stmts)*
