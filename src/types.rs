@@ -174,14 +174,14 @@ impl<'a> DecodeStatic<'a> for Vec<BytesZcp<'a>> {
         let len = as_usize(&buf[len_offset..]);
         let tail_offset = len_offset + 32;
 
-        (0..len)
+        Ok((0..len)
             .map(|i| {
                 let next_tail_offset = tail_offset + i * 32;
                 // the tail offsets don't include the outer header words hence +32
                 as_usize(unsafe { buf.get_unchecked(next_tail_offset..) }) + len_offset + 32
             })
-            .map(|o| DecodeStatic::decode(&buf[o..]))
-            .collect::<Result<Vec<BytesZcp<'_>>, ()>>()
+            .map(|o| BytesZcp::decode(&buf[o..]).unwrap())
+            .collect())
     }
 }
 
