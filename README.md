@@ -25,7 +25,7 @@ let foo = Foo::decode(input).unwrap();
 
 ## Bench
 ```bash
-cd types && cargo +nightly bench --features bench --profile=release 
+cargo +nightly bench --features bench --profile=release 
 ```
 
 ```rust

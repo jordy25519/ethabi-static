@@ -10,3 +10,6 @@ ethabi-static = { path = "../" }
 ethabi = "*"
 ethereum-types = "*"
 hex-literal = "*"
+
+[features]
+bench = []

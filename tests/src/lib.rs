@@ -1,3 +1,8 @@
+#![cfg_attr(feature = "bench", feature(test))]
+
+#[cfg(feature = "bench")]
+mod bench;
+
 mod derive_integration;
 
 const V2_RESULTS: &[u8] = &[
