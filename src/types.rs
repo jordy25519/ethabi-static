@@ -37,8 +37,8 @@ impl<'a> AsRef<[u8]> for BytesZcp<'a> {
 }
 
 /// bytesN
-#[derive(Debug)]
-pub struct FixedBytesZcp<'a, const N: usize>(&'a [u8; N]);
+#[derive(Debug, PartialEq)]
+pub struct FixedBytesZcp<'a, const N: usize>(pub &'a [u8; N]);
 
 impl<'a, const N: usize> FixedBytesZcp<'a, N> {
     fn new(val: &'a [u8]) -> Self {

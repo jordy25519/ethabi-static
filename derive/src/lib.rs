@@ -79,10 +79,13 @@ fn decode_steps(data: Data) -> TokenStream {
                 for (idx, f) in fields_named.named.iter().enumerate() {
                     let f_name = f.ident.clone().unwrap();
                     let f_type = &f.ty;
-                    let offset = idx * 32_usize;
-                    let type_string = f_type.to_token_stream().to_string();
-                    let is_bytes = type_string.contains("BytesZcp");
-                    let is_statics_list = !is_bytes && type_string.starts_with("Vec");
+                    let offset = 32_usize * idx;
+                    let type_string = f_type.to_token_stream().to_string().replace(" ", "");
+
+                    let field_is_dynamic: bool =
+                        type_string.starts_with("Vec") || type_string.starts_with("BytesZcp");
+                    let is_statics_list =
+                        type_string.starts_with("Vec") && !type_string.starts_with("Vec<BytesZcp"); // i.e not a vec of dynamics
 
                     if should_skip(&f.attrs) {
                         tail_stmts.push(quote! {
@@ -91,7 +94,7 @@ fn decode_steps(data: Data) -> TokenStream {
                         continue;
                     }
 
-                    if !is_bytes && !is_statics_list {
+                    if !field_is_dynamic && !is_statics_list {
                         head_stmts.push(quote! {
                             let #f_name = <#f_type>::decode_static(buf, #offset)?;
                         });
