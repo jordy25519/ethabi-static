@@ -55,14 +55,6 @@ fn slice_as_array<T, const N: usize>(slice: &[T]) -> &[T; N] {
     unsafe { &*(slice as *const [T] as *const [T; N]) }
 }
 
-fn as_usize(buf: &[u8]) -> usize {
-    // OPTIMIZATION: nothing sensible should ever be longer than 2 ** 16 so we ignore the other bytes
-    // ((unsafe { *buf.get_unchecked(28) } as usize) << 24)
-    //     + ((unsafe { *buf.get_unchecked(29) } as usize) << 16)
-    ((unsafe { *buf.get_unchecked(30) } as usize) << 8)
-        + (unsafe { *buf.get_unchecked(31) } as usize)
-}
-
 impl<'a> DecodeStatic<'a> for AddressZcp<'a> {
     fn decode_static(buf: &'a [u8], offset: usize) -> Result<Self, ()> {
         let result = AddressZcp::new(&buf[offset + 12..offset + 32]);
@@ -275,3 +267,10 @@ impl<'a, const N: usize> DecodeStatic<'a> for FixedBytesZcp<'a, N> {
 //         Ok(tokens)
 //     }
 // }
+pub (crate) fn as_usize(buf: &[u8]) -> usize {
+    // OPTIMIZATION: nothing sensible should ever be longer than 2 ** 16 so we ignore the other bytes
+    // ((unsafe { *buf.get_unchecked(28) } as usize) << 24)
+    //     + ((unsafe { *buf.get_unchecked(29) } as usize) << 16)
+    ((unsafe { *buf.get_unchecked(30) } as usize) << 8)
+        + (unsafe { *buf.get_unchecked(31) } as usize)
+}
