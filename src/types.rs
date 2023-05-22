@@ -11,7 +11,7 @@ pub trait DecodeStatic<'a>: Sized {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct AddressZcp<'a>(pub &'a [u8; 20]);
 
 impl<'a> AsRef<[u8; 20]> for AddressZcp<'a> {
@@ -267,7 +267,7 @@ impl<'a, const N: usize> DecodeStatic<'a> for FixedBytesZcp<'a, N> {
 //         Ok(tokens)
 //     }
 // }
-pub (crate) fn as_usize(buf: &[u8]) -> usize {
+pub(crate) fn as_usize(buf: &[u8]) -> usize {
     // OPTIMIZATION: nothing sensible should ever be longer than 2 ** 16 so we ignore the other bytes
     // ((unsafe { *buf.get_unchecked(28) } as usize) << 24)
     //     + ((unsafe { *buf.get_unchecked(29) } as usize) << 16)
