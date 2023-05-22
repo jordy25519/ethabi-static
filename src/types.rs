@@ -129,7 +129,7 @@ impl<'a> DecodeStatic<'a> for BytesZcp<'a> {
 }
 
 /// An array of dynamic tuples
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Tuples<T>(pub Vec<T>);
 
 impl<T> From<Vec<T>> for Tuples<T> {
