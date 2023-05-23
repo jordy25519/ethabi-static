@@ -154,19 +154,30 @@ where
     /// Assumes array of tuples
     fn decode_static(buf: &'a [u8], offset: usize) -> Result<Self, ()> {
         let len_offset = as_usize(&buf[offset..]);
-        let len = as_usize(&buf[len_offset..]);
+        let len: usize = as_usize(&buf[len_offset..]);
         let tail_offset = len_offset + 32;
-        let shift = 32 + len_offset;
 
         Ok((0..len)
             .map(|i| {
                 let next_tail_offset = tail_offset + i * 32;
                 // the tail offsets don't include the outer header hence +shift
-                as_usize(unsafe { buf.get_unchecked(next_tail_offset..) }) + shift
+                as_usize(unsafe { buf.get_unchecked(next_tail_offset..) }) + tail_offset
             })
             .map(|o| T::decode(unsafe { buf.get_unchecked(o..) }).unwrap())
             .collect::<Vec<T>>()
             .into())
+    }
+}
+
+/// helper to decode `T` as a dynamic tuple (default behaviour of `T` as a static tuple)
+#[derive(Debug, Default, PartialEq)]
+pub struct Tuple<T>(pub T);
+
+// dynamic tuple
+impl<'a, T: DecodeStatic<'a>> DecodeStatic<'a> for Tuple<T> {
+    fn decode_static(buf: &'a [u8], offset: usize) -> Result<Self, ()> {
+        let tail_offset = as_usize(&buf[offset..]);
+        Ok(Self(T::decode(&buf[tail_offset..]).unwrap()))
     }
 }
 
