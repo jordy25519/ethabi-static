@@ -3,7 +3,7 @@
 use crate::V2_RESULTS;
 
 use ethabi::{ParamType, Token};
-use ethabi_static::{AddressZcp, BytesZcp, DecodeStatic, FixedBytesZcp, Tuples, Tuple, Wrapped};
+use ethabi_static::{AddressZcp, BytesZcp, DecodeStatic, FixedBytesZcp, Tuple, Tuples, Wrapped};
 use ethereum_types::U256;
 use hex_literal::hex;
 
