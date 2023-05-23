@@ -36,6 +36,15 @@ impl<'a> AsRef<[u8]> for BytesZcp<'a> {
     }
 }
 
+/// bytes32
+pub type Bytes32<'a> = FixedBytesZcp<'a, 32>;
+/// bytes16
+pub type Bytes16<'a> = FixedBytesZcp<'a, 16>;
+/// bytes8
+pub type Bytes8<'a> = FixedBytesZcp<'a, 8>;
+/// bytes4
+pub type Bytes4<'a> = FixedBytesZcp<'a, 4>;
+
 /// bytesN
 #[derive(Debug, PartialEq)]
 pub struct FixedBytesZcp<'a, const N: usize>(pub &'a [u8; N]);
