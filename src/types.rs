@@ -161,36 +161,39 @@ where
     }
 }
 
-impl<'a> DecodeStatic<'a> for Vec<BytesZcp<'a>> {
+pub struct Array<T, const D: bool>(pub Vec<T>);
+
+impl<'a, T: DecodeStatic<'a>> DecodeStatic<'a> for Array<T, true> {
     fn decode_static(buf: &'a [u8], len_offset: usize) -> Result<Self, ()> {
         let len = as_usize(&buf[len_offset..]);
         let tail_offset = len_offset + 32;
+        let mut items = Vec::with_capacity(len);
 
-        Ok((0..len)
+        (0..len)
             .map(|i| {
                 let next_tail_offset = tail_offset + i * 32;
-                // the tail offsets don't include the outer header words hence +32
-                as_usize(unsafe { buf.get_unchecked(next_tail_offset..) }) + len_offset + 32
+                // the tail offsets don't include the length word hence +32
+                as_usize(unsafe { buf.get_unchecked(next_tail_offset..) }) + tail_offset
             })
-            .map(|o| BytesZcp::decode(&buf[o..]).unwrap())
-            .collect())
+            .for_each(|o| {
+                items.push(T::decode(&buf[o..]).unwrap());
+            });
+
+        Ok(Self(items))
     }
 }
 
-pub struct StaticsVec<T>(pub Vec<T>);
-
-impl<'a, T: DecodeStatic<'a>> DecodeStatic<'a> for StaticsVec<T> {
+impl<'a, T: DecodeStatic<'a>> DecodeStatic<'a> for Array<T, false> {
     fn decode_static(buf: &'a [u8], len_offset: usize) -> Result<Self, ()> {
         let len = as_usize(&buf[len_offset..]);
+        let mut items = Vec::with_capacity(len);
+        (0..len).for_each(|i| {
+            // the tail offsets don't include the length word hence +32
+            let idx = len_offset + 32 + i * 32;
+            items.push(DecodeStatic::decode(&buf[idx..]).unwrap());
+        });
 
-        Ok(Self(
-            (0..len)
-                .map(|i| {
-                    let idx = len_offset + 32 + i * 32;
-                    DecodeStatic::decode(&buf[idx..]).unwrap()
-                })
-                .collect::<Vec<T>>(),
-        ))
+        Ok(Self(items))
     }
 }
 

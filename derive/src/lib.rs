@@ -82,10 +82,8 @@ fn decode_steps(data: Data) -> TokenStream {
                     let offset = 32_usize * idx;
                     let type_string = f_type.to_token_stream().to_string().replace(" ", "");
 
-                    let field_is_dynamic: bool =
-                        type_string.starts_with("Vec") || type_string.starts_with("BytesZcp");
-                    let is_statics_list =
-                        type_string.starts_with("Vec") && !type_string.starts_with("Vec<BytesZcp"); // i.e not a vec of dynamics
+                    let is_list = type_string.starts_with("Vec");
+                    let field_is_dynamic: bool = is_list || type_string.starts_with("BytesZcp");
 
                     if should_skip(&f.attrs) {
                         tail_stmts.push(quote! {
@@ -94,7 +92,7 @@ fn decode_steps(data: Data) -> TokenStream {
                         continue;
                     }
 
-                    if !field_is_dynamic && !is_statics_list {
+                    if !field_is_dynamic {
                         head_stmts.push(quote! {
                             let #f_name = <#f_type>::decode_static(buf, #offset)?;
                         });
@@ -110,9 +108,21 @@ fn decode_steps(data: Data) -> TokenStream {
                             let #f_name = ((unsafe { *buf.get_unchecked(#offset + 30) } as usize) << 8) + (unsafe { *buf.get_unchecked(#offset + 31) } as usize);
                         }
                     );
-                    if is_statics_list {
+
+                    if is_list {
+                        let mut ts = f_type.clone().into_token_stream().into_iter();
+                        let dynamic_inner =
+                            if let Some(proc_macro2::TokenTree::Ident(list_type)) = ts.nth(2) {
+                                if list_type == "Vec" {
+                                    unimplemented!("nested arrays unsupported");
+                                }
+                                list_type.to_string() == "BytesZcp"
+                            } else {
+                                false
+                            };
+
                         tail_stmts.push(quote! {
-                            #f_name: <_ethabi_static::StaticsVec<_>>::decode_static(buf, #f_name)?.0,
+                            #f_name: <_ethabi_static::Array<_, #dynamic_inner>>::decode_static(buf, #f_name)?.0,
                         });
                     } else {
                         tail_stmts.push(quote! {
