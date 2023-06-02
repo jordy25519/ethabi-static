@@ -1,11 +1,13 @@
 #![cfg_attr(feature = "bench", feature(test))]
+#![cfg_attr(feature = "bench", feature(allocator_api))]
 
 #[cfg(feature = "bench")]
 mod bench;
 
+#[cfg(not(feature = "bench"))]
 mod derive_integration;
 
-const V2_RESULTS: &[u8] = &[
+pub (crate) const V2_RESULTS: &[u8] = &[
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 4, // heads

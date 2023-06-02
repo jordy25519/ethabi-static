@@ -30,6 +30,6 @@ cargo +nightly bench --features bench --profile=release
 
 ```rust
 running 2 tests
-test bench::test_ethabi_decode        ... bench:      88,132 ns/iter (+/- 28,037)
-test bench::test_ethabi_static_decode ... bench:       5,901 ns/iter (+/- 273)
+test bench::test_ethabi_decode               ... bench:     115,997 ns/iter (+/- 27,218)
+test bench::test_ethabi_static_decode_bumped ... bench:       4,841 ns/iter (+/- 540)
 ```

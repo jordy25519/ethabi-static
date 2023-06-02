@@ -14,7 +14,8 @@ pub fn decode_static_derive(input: proc_macro::TokenStream) -> proc_macro::Token
     };
 
     let name = &input.ident;
-    let steps = decode_steps(input.data);
+    let steps = decode_steps(&input.data);
+    let steps_static = decode_steps_static(&input.data);
 
     // TODO: do this with one quote...
     // support 1 lifetime and 1 generic only
@@ -39,6 +40,9 @@ pub fn decode_static_derive(input: proc_macro::TokenStream) -> proc_macro::Token
                 impl<#lifetime> DecodeStatic<#lifetime> for #name<#lifetime> {
                     fn decode_static(buf: &#lifetime [u8], offset: usize) -> Result<Self, ()> {
                         #steps
+                    }
+                    fn decode_static_into(buf: &#lifetime [u8], offset: usize, bump: &#lifetime Bump) -> Result<Self, ()> {
+                        #steps_static
                     }
                 }
             }
@@ -68,9 +72,9 @@ pub fn decode_static_derive(input: proc_macro::TokenStream) -> proc_macro::Token
     .into()
 }
 
-fn decode_steps(data: Data) -> TokenStream {
+fn decode_steps(data: &Data) -> TokenStream {
     match data {
-        Data::Struct(data) => match data.fields {
+        Data::Struct(data) => match &data.fields {
             Fields::Named(fields_named) => {
                 let len = fields_named.named.len();
                 let mut head_stmts = Vec::<TokenStream>::with_capacity(len);
@@ -80,7 +84,7 @@ fn decode_steps(data: Data) -> TokenStream {
                     let f_name = f.ident.clone().unwrap();
                     let f_type = &f.ty;
                     let offset = 32_usize * idx;
-                    let type_string = f_type.to_token_stream().to_string().replace(" ", "");
+                    let type_string = f_type.to_token_stream().to_string().replace(' ', "");
 
                     let is_list = type_string.starts_with("Vec");
                     let field_is_dynamic: bool = is_list || type_string.starts_with("BytesZcp");
@@ -110,20 +114,109 @@ fn decode_steps(data: Data) -> TokenStream {
                     );
 
                     if is_list {
-                        let mut ts = f_type.clone().into_token_stream().into_iter();
-                        let dynamic_inner =
+                        let mut ts = f_type.into_token_stream().into_iter();
+                        let (dynamic_inner, bump) =
                             if let Some(proc_macro2::TokenTree::Ident(list_type)) = ts.nth(2) {
                                 if list_type == "Vec" {
                                     unimplemented!("nested arrays unsupported");
                                 }
-                                list_type.to_string() == "BytesZcp"
+                                (
+                                    list_type.to_string().contains("BytesZcp"),
+                                    type_string.contains("Bump"),
+                                )
                             } else {
-                                false
+                                (false, false)
                             };
 
                         tail_stmts.push(quote! {
-                            #f_name: <_ethabi_static::Array<_, #dynamic_inner>>::decode_static(buf, #f_name)?.0,
+                                #f_name: <_ethabi_static::Array<_, #dynamic_inner>>::decode_static(buf, #f_name)?.0,
+                            });
+                    } else {
+                        tail_stmts.push(quote! {
+                            #f_name: <#f_type>::decode_static(buf, #f_name)?,
                         });
+                    }
+                }
+
+                quote! {
+                    extern crate ethabi_static as _ethabi_static;
+                    #(#head_stmts)*
+                    Ok(Self {
+                        #(#tail_stmts)*
+                    })
+                }
+            }
+            _ => unimplemented!(),
+        },
+        _ => unimplemented!(),
+    }
+}
+
+fn decode_steps_static(data: &Data) -> TokenStream {
+    match data {
+        Data::Struct(data) => match &data.fields {
+            Fields::Named(fields_named) => {
+                let len = fields_named.named.len();
+                let mut head_stmts = Vec::<TokenStream>::with_capacity(len);
+                let mut tail_stmts = Vec::<TokenStream>::with_capacity(len);
+
+                for (idx, f) in fields_named.named.iter().enumerate() {
+                    let f_name = f.ident.clone().unwrap();
+                    let f_type = &f.ty;
+                    let offset = 32_usize * idx;
+                    let type_string = f_type.to_token_stream().to_string().replace(' ', "");
+
+                    let is_list = type_string.starts_with("Vec");
+                    let field_is_dynamic: bool = is_list || type_string.starts_with("BytesZcp");
+
+                    if should_skip(&f.attrs) {
+                        tail_stmts.push(quote! {
+                            #f_name: Default::default(),
+                        });
+                        continue;
+                    }
+
+                    if !field_is_dynamic {
+                        head_stmts.push(quote! {
+                            let #f_name = <#f_type>::decode_static(buf, #offset)?;
+                        });
+                        tail_stmts.push(quote! {
+                            #f_name,
+                        });
+                        continue;
+                    }
+
+                    // if dynamic we read the head then decode tail after
+                    head_stmts.push(
+                        quote! {
+                            let #f_name = ((unsafe { *buf.get_unchecked(#offset + 30) } as usize) << 8) + (unsafe { *buf.get_unchecked(#offset + 31) } as usize);
+                        }
+                    );
+
+                    if is_list {
+                        let mut ts = f_type.into_token_stream().into_iter();
+                        let (dynamic_inner, bump) =
+                            if let Some(proc_macro2::TokenTree::Ident(list_type)) = ts.nth(2) {
+                                if list_type == "Vec" {
+                                    unimplemented!("nested arrays unsupported");
+                                }
+                                (
+                                    list_type.to_string().contains("BytesZcp"),
+                                    type_string.contains("Bump"),
+                                )
+                            } else {
+                                (false, false)
+                            };
+
+                        if bump {
+                            tail_stmts.push(quote! {
+                                    #f_name: <_ethabi_static::Array<_, #dynamic_inner>>::decode_static_into(buf, #f_name, bump)?.0,
+                                });
+                        } else {
+                            tail_stmts.push(quote! {
+                                    #f_name: <_ethabi_static::Array<_, #dynamic_inner>>::decode_static(buf, #f_name)?.0,
+                                });
+                        }
                     } else {
                         tail_stmts.push(quote! {
                             #f_name: <#f_type>::decode_static(buf, #f_name)?,
